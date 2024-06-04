@@ -1,0 +1,4 @@
+# ninja log v5
+0	10666	1711540089606006027	/data2/wangyichen/FlashAvatar/submodules/simple-knn/build/temp.linux-x86_64-cpython-37/simple_knn.o	5220adb35dd041b3
+0	26746	1711540105670010249	/data2/wangyichen/FlashAvatar/submodules/simple-knn/build/temp.linux-x86_64-cpython-37/ext.o	c580e03acc13045d
+1	54772	1711540133714017620	/data2/wangyichen/FlashAvatar/submodules/simple-knn/build/temp.linux-x86_64-cpython-37/spatial.o	2f35a20ff119d27c
