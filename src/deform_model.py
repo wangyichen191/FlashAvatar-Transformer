@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from pytorch3d.io import load_obj
 
 from flame import FLAME_mica, parse_args
+from .transformer import UVTransformer
 from utils.general_utils import Pytorch3dRasterizer, Embedder, load_binary_pickle, a_in_b_torch, face_vertices_gen
 
 
@@ -49,11 +50,24 @@ class Deform_Model(nn.Module):
 
     def init_networks(self):       
         ## full mica 
-        self.deformNet = MLP(
-            input_dim=self.pts_embedder.dim_embeded+120,
-            output_dim=10,
-            hidden_dim=256,
-            hidden_layers=6
+        # self.deformNet = MLP(
+        #     input_dim=self.pts_embedder.dim_embeded+120,
+        #     output_dim=10,
+        #     hidden_dim=256,
+        #     hidden_layers=6
+        # )
+        self.deformNet = UVTransformer(
+            uv_size=128,
+            patch_size=1,
+            pixel_dim=8,
+            dim=128,
+            mlp_dim=128,
+            out_dim=10,
+            cond_dim=120,
+            qk_dim=32,
+            v_dim=32,
+            depth=2,
+            head=4,
         )
         
     def example_init(self, codedict):
@@ -94,6 +108,13 @@ class Deform_Model(nn.Module):
             & a_in_b_torch(self.pix_to_v_idx[:,1], self.neckhead_id_tensor)
             & a_in_b_torch(self.pix_to_v_idx[:,2], self.neckhead_id_tensor)
         ) # (14876),bool类型
+
+        # Transformer input
+        self.transformer_input = torch.cat((
+            rast_out,
+            pix_to_face.permute(0, 3, 1, 2),
+            bary_coords.squeeze(3).permute(0, 3, 1, 2)
+        ), dim=1)
     
     def decode(self, codedict, use_xyz_offset=True):
         shape_code = codedict['shape'].detach()
@@ -105,9 +126,14 @@ class Deform_Model(nn.Module):
         condition = torch.cat((expr_code, jaw_pose, eyes_pose, eyelids), dim=1)
 
         # MLP
-        condition = condition.unsqueeze(1).repeat(1, self.v_num, 1)
-        uv_vertices_shape_embeded_condition = torch.cat((self.uv_vertices_shape_embeded, condition), dim=2)
-        deforms = self.deformNet(uv_vertices_shape_embeded_condition)
+        # condition = condition.unsqueeze(1).repeat(1, self.v_num, 1)
+        # uv_vertices_shape_embeded_condition = torch.cat((self.uv_vertices_shape_embeded, condition), dim=2)
+        # deforms = self.deformNet(uv_vertices_shape_embeded_condition)
+        # Transformer 
+        condition = condition.unsqueeze(1)
+        deforms = self.deformNet(self.transformer_input, condition)
+        deforms = deforms[0][self.uvmask_flaten_idx].unsqueeze(0)
+
         deforms = torch.tanh(deforms)
         uv_vertices_deforms = deforms[..., :3]
         rot_delta_0 = deforms[..., 3:7]
