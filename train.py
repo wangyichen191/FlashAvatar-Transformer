@@ -98,25 +98,40 @@ if __name__ == "__main__":
     viewpoint_stack = None
     first_iter += 1
     mid_num = 15000
+
+    if not args.test:
+        if not viewpoint_stack:
+            viewpoint_stack = scene.getCameras().copy()
+            random.shuffle(viewpoint_stack)
+            if len(viewpoint_stack)>2000: 
+                viewpoint_stack = viewpoint_stack[:2000]
+        viewpoint_cam = viewpoint_stack.pop(random.randint(0, len(viewpoint_stack)-1)) 
+    else:
+        if not viewpoint_stack:
+            viewpoint_stack = scene.getCameras().copy()
+            if len(viewpoint_stack)>2000: 
+                viewpoint_stack = viewpoint_stack[:2000]
+        viewpoint_cam = viewpoint_stack.pop()
+
     for iteration in range(first_iter, opt.iterations + 1):
         # Every 500 its we increase the levels of SH up to a maximum degree
         if iteration % 500 == 0:
             gaussians.oneupSHdegree()
 
         # random Camera when train
-        if not args.test:
-            if not viewpoint_stack:
-                viewpoint_stack = scene.getCameras().copy()
-                random.shuffle(viewpoint_stack)
-                if len(viewpoint_stack)>2000: 
-                    viewpoint_stack = viewpoint_stack[:2000]
-            viewpoint_cam = viewpoint_stack.pop(random.randint(0, len(viewpoint_stack)-1)) 
-        else:
-            if not viewpoint_stack:
-                viewpoint_stack = scene.getCameras().copy()
-                if len(viewpoint_stack)>2000: 
-                    viewpoint_stack = viewpoint_stack[:2000]
-            viewpoint_cam = viewpoint_stack.pop() 
+        # if not args.test:
+        #     if not viewpoint_stack:
+        #         viewpoint_stack = scene.getCameras().copy()
+        #         random.shuffle(viewpoint_stack)
+        #         if len(viewpoint_stack)>2000: 
+        #             viewpoint_stack = viewpoint_stack[:2000]
+        #     viewpoint_cam = viewpoint_stack.pop(random.randint(0, len(viewpoint_stack)-1)) 
+        # else:
+        #     if not viewpoint_stack:
+        #         viewpoint_stack = scene.getCameras().copy()
+        #         if len(viewpoint_stack)>2000: 
+        #             viewpoint_stack = viewpoint_stack[:2000]
+        #     viewpoint_cam = viewpoint_stack.pop() 
         frame_id = viewpoint_cam.uid
 
         # deform gaussians
@@ -186,53 +201,55 @@ if __name__ == "__main__":
                 torch.save((DeformModel.capture(), gaussians.capture(), iteration), model_dir + "/chkpnt" + str(iteration) + ".pth")
 
             # save gaussian
-            if iteration % (50 if args.test else 5000) == 0:
-                # compute average exp
-                # expr = DeformModel.default_expr_code
-                # eyelids = torch.zeros_like(viewpoint_cam.eyelids).to(args.device)
-                # eyes_pose = torch.zeros_like(viewpoint_cam.eyes_pose).to(args.device)
-                # jaw_pose = torch.zeros_like(viewpoint_cam.jaw_pose).to(args.device)
-                viewpoint_list = scene.getCameras().copy()
-                # for viewpoint in viewpoint_list:
-                #     expr += viewpoint.exp_param
-                #     eyelids += viewpoint.eyelids
-                #     eyes_pose += viewpoint.eyes_pose
-                #     jaw_pose += viewpoint.jaw_pose
-                # average_expr = expr/len(viewpoint_list)
-                # average_eyelids = eyelids/len(viewpoint_list)
-                # average_eyes_pose = eyes_pose/len(viewpoint_list)
-                # average_jaw_pose = jaw_pose/len(viewpoint_list)
+            if iteration % 5000 == 0:
+                gaussians.save_ply(os.path.join(ply_dir, f"{iteration}" + ".ply"))
+            # if iteration % (50 if args.test else 5000) == 0:
+            #     # compute average exp
+            #     # expr = DeformModel.default_expr_code
+            #     # eyelids = torch.zeros_like(viewpoint_cam.eyelids).to(args.device)
+            #     # eyes_pose = torch.zeros_like(viewpoint_cam.eyes_pose).to(args.device)
+            #     # jaw_pose = torch.zeros_like(viewpoint_cam.jaw_pose).to(args.device)
+            #     viewpoint_list = scene.getCameras().copy()
+            #     # for viewpoint in viewpoint_list:
+            #     #     expr += viewpoint.exp_param
+            #     #     eyelids += viewpoint.eyelids
+            #     #     eyes_pose += viewpoint.eyes_pose
+            #     #     jaw_pose += viewpoint.jaw_pose
+            #     # average_expr = expr/len(viewpoint_list)
+            #     # average_eyelids = eyelids/len(viewpoint_list)
+            #     # average_eyes_pose = eyes_pose/len(viewpoint_list)
+            #     # average_jaw_pose = jaw_pose/len(viewpoint_list)
 
-                I = matrix_to_rotation_6d(torch.cat([torch.eye(3)[None]], dim=0).to(args.device))
-                codedict['expr'] = viewpoint_list[457].exp_param
-                codedict['eyelids'] = viewpoint_list[457].eyelids
-                codedict['eyes_pose'] = viewpoint_list[457].eyes_pose
-                codedict['jaw_pose'] = viewpoint_list[457].jaw_pose
-                verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, use_xyz_offset=True)
-                gaussians.update_xyz_rot_scale(verts_final[0], rot_delta[0], scale_coef[0], update_xyz=False)
+            #     I = matrix_to_rotation_6d(torch.cat([torch.eye(3)[None]], dim=0).to(args.device))
+            #     codedict['expr'] = viewpoint_list[457].exp_param
+            #     codedict['eyelids'] = viewpoint_list[457].eyelids
+            #     codedict['eyes_pose'] = viewpoint_list[457].eyes_pose
+            #     codedict['jaw_pose'] = viewpoint_list[457].jaw_pose
+            #     verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, use_xyz_offset=True)
+            #     gaussians.update_xyz_rot_scale(verts_final[0], rot_delta[0], scale_coef[0], update_xyz=False)
 
-                print("\n[ITER {}] Saving Gaussian".format(iteration))
-                gaussians.save_ply(os.path.join(ply_dir, f"{iteration}_neural" + ".ply"))
+            #     print("\n[ITER {}] Saving Gaussian".format(iteration))
+            #     gaussians.save_ply(os.path.join(ply_dir, f"{iteration}_neural" + ".ply"))
 
-                # render video
-                video_path = os.path.join(video_dir, f"{iteration}_neural" + ".mp4")
-                with imageio.get_writer(video_path, mode='I', fps=60, codec='libx264') as video_out:
-                    yaw_scale = 50.0
-                    pitch_scale = 20.0
-                    num_frames = 300
-                    for idx in tqdm(range(num_frames), desc="render video"):
-                        c = angle2cam_mv(
-                                yaw=torch.tensor(yaw_scale * np.sin(idx*np.pi*2/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
-                                # pitch=torch.tensor(max(pitch_scale, ) * np.sin(idx*np.pi*4/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
-                                pitch=torch.tensor( pitch_scale * np.sin(idx*np.pi*4/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
-                                radius=1.3
-                            )
-                        cam_list = PanoHeadcam2Gaussiancam(c, 'cuda', viewpoint_cam)
-                        view = cam_list[0]
-                        img = render(view, gaussians, ppt, background)["render"]
-                        img = (img * 255).clamp(0, 255).squeeze(0).to(torch.uint8)
-                        img = img.permute(1,2,0).to('cpu').numpy()
-                        video_out.append_data(img)
+            #     # render video
+            #     video_path = os.path.join(video_dir, f"{iteration}_neural" + ".mp4")
+            #     with imageio.get_writer(video_path, mode='I', fps=60, codec='libx264') as video_out:
+            #         yaw_scale = 50.0
+            #         pitch_scale = 20.0
+            #         num_frames = 300
+            #         for idx in tqdm(range(num_frames), desc="render video"):
+            #             c = angle2cam_mv(
+            #                     yaw=torch.tensor(yaw_scale * np.sin(idx*np.pi*2/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
+            #                     # pitch=torch.tensor(max(pitch_scale, ) * np.sin(idx*np.pi*4/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
+            #                     pitch=torch.tensor( pitch_scale * np.sin(idx*np.pi*4/num_frames), device='cuda').unsqueeze(0).type(torch.float32)/180 * np.pi, 
+            #                     radius=1.3
+            #                 )
+            #             cam_list = PanoHeadcam2Gaussiancam(c, 'cuda', viewpoint_cam)
+            #             view = cam_list[0]
+            #             img = render(view, gaussians, ppt, background)["render"]
+            #             img = (img * 255).clamp(0, 255).squeeze(0).to(torch.uint8)
+            #             img = img.permute(1,2,0).to('cpu').numpy()
+            #             video_out.append_data(img)
         DeformModel.train()
 
                 
