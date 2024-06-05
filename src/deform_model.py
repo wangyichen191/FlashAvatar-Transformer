@@ -37,6 +37,7 @@ class Deform_Model(nn.Module):
         # rasterizer
         self.uv_size = 128
         self.uv_rasterizer = Pytorch3dRasterizer(self.uv_size)
+        self.uv_rasterizer_super = Pytorch3dRasterizer(self.uv_size*2)
         
         # flame mask
         flame_mask_path = "flame/FLAME_masks/FLAME_masks.pkl"   
@@ -57,16 +58,16 @@ class Deform_Model(nn.Module):
         #     hidden_layers=6
         # )
         self.deformNet = UVTransformer(
-            uv_size=128,
-            patch_size=1,
-            pixel_dim=8,
-            dim=128,
-            mlp_dim=128,
+            uv_size=256,
+            patch_size=4,
+            pixel_dim=4,
+            dim=256,
+            mlp_dim=256,
             out_dim=10,
             cond_dim=120,
-            qk_dim=32,
-            v_dim=32,
-            depth=2,
+            qk_dim=64,
+            v_dim=64,
+            depth=8,
             head=4,
         )
         
@@ -110,11 +111,17 @@ class Deform_Model(nn.Module):
         ) # (14876),bool类型
 
         # Transformer input
-        self.transformer_input = torch.cat((
-            rast_out,
-            pix_to_face.permute(0, 3, 1, 2),
-            bary_coords.squeeze(3).permute(0, 3, 1, 2)
-        ), dim=1)
+        rast_out_super, pix_to_face_super, bary_coords_super = self.uv_rasterizer_super(
+            self.uvcoords.expand(batch_size, -1, -1),
+            self.uvfaces.expand(batch_size, -1, -1),
+            face_vertices_shape
+        )
+        # self.transformer_input = torch.cat((
+        #     rast_out_super,
+        #     pix_to_face_super.permute(0, 3, 1, 2),
+        #     bary_coords_super.squeeze(3).permute(0, 3, 1, 2)
+        # ), dim=1)
+        self.transformer_input = rast_out_super
     
     def decode(self, codedict, use_xyz_offset=True):
         shape_code = codedict['shape'].detach()

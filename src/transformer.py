@@ -11,6 +11,7 @@ class UVTransformer(nn.Module):
         assert uv_size % patch_size == 0
         num_patches = (uv_size // patch_size) ** 2
         patch_dim = patch_size ** 2 * pixel_dim
+        self.head = head
 
         self.to_patch_embedding = nn.Sequential(
             Rearrange_torch('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', \
@@ -27,13 +28,14 @@ class UVTransformer(nn.Module):
                                        mlp_dim=mlp_dim, cond_dim=cond_dim, \
                                        qk_dim=qk_dim, v_dim=v_dim, \
                                        dropout=dropout)
-        self.mlp = nn.Linear(dim, out_dim)
+        self.mlp = nn.Linear(dim//head, out_dim)
 
     def forward(self, uvimage, cond):
         patch_embedding = self.to_patch_embedding(uvimage)
         patch_embedding += self.positional_embedding
         x = self.dropout(patch_embedding)
         x = self.transformer(x, cond)
+        x = Rearrange(x, 'b n (h d) -> b (n h) d', h=self.head)
         return self.mlp(x)
 
 
@@ -77,7 +79,7 @@ class CrossAttention(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.norm_cond = nn.LayerNorm(cond_dim)
         
-        self.proj_q = nn.Linear(cond_dim, head*qk_dim)
+        self.proj_q = nn.Linear(cond_dim, qk_dim)
         self.proj_k = nn.Linear(dim, head*qk_dim)
         self.proj_v = nn.Linear(dim, head*v_dim)
         self.head = head
@@ -93,7 +95,7 @@ class CrossAttention(nn.Module):
     def forward(self, x, cond):
         x = self.norm(x)
         cond = self.norm_cond(cond)
-        q = self.proj_q(cond).repeat(1, x.shape[1], 1)
+        q = self.proj_q(cond).repeat(1, x.shape[1], self.head)
         k = self.proj_k(x)
         v = self.proj_v(x)
         q = Rearrange(q, 'b n (h d) -> b h n d', h=self.head)
