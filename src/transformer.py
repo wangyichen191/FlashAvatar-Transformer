@@ -79,9 +79,9 @@ class CrossAttention(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.norm_cond = nn.LayerNorm(cond_dim)
         
-        self.proj_q = nn.Linear(cond_dim, qk_dim)
-        self.proj_k = nn.Linear(dim, head*qk_dim)
-        self.proj_v = nn.Linear(dim, head*v_dim)
+        self.proj_q = nn.Linear(cond_dim, qk_dim, bias=False)
+        self.proj_k = nn.Linear(dim, head*qk_dim, bias=False)
+        self.proj_v = nn.Linear(dim, head*v_dim, bias=False)
         self.head = head
         self.scale = qk_dim ** -0.5
         self.softmax = nn.Softmax(dim=-1)

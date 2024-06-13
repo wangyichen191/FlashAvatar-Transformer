@@ -124,8 +124,8 @@ if __name__ == "__main__":
         codedict['eyes_pose'] = viewpoint_cam.eyes_pose
         codedict['eyelids'] = viewpoint_cam.eyelids
         codedict['jaw_pose'] = viewpoint_cam.jaw_pose 
-        verts_final, rot_delta, scale_coef = DeformModel.decode(codedict)
-        
+        # verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, scaling=10-(iteration / opt.iterations)*9)
+        verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, scaling=10)
         if iteration == 1:
             gaussians.create_from_verts(verts_final[0])
             gaussians.training_setup(opt)
@@ -186,6 +186,8 @@ if __name__ == "__main__":
                 torch.save((DeformModel.capture(), gaussians.capture(), iteration), model_dir + "/chkpnt" + str(iteration) + ".pth")
 
             # save gaussian
+            # if iteration % 5000 == 0:
+            #     gaussians.save_ply(os.path.join(ply_dir, f"{iteration}" + ".ply"))
             if iteration % (50 if args.test else 5000) == 0:
                 # compute average exp
                 # expr = DeformModel.default_expr_code
@@ -208,14 +210,14 @@ if __name__ == "__main__":
                 codedict['eyelids'] = viewpoint_list[457].eyelids
                 codedict['eyes_pose'] = viewpoint_list[457].eyes_pose
                 codedict['jaw_pose'] = viewpoint_list[457].jaw_pose
-                verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, use_xyz_offset=True)
-                gaussians.update_xyz_rot_scale(verts_final[0], rot_delta[0], scale_coef[0], update_xyz=False)
+                verts_final, rot_delta, scale_coef = DeformModel.decode(codedict, scaling=10-(iteration / opt.iterations)*9)
+                gaussians.update_xyz_rot_scale(verts_final[0], rot_delta[0], scale_coef[0])
 
                 print("\n[ITER {}] Saving Gaussian".format(iteration))
                 gaussians.save_ply(os.path.join(ply_dir, f"{iteration}_neural" + ".ply"))
 
                 # render video
-                video_path = os.path.join(video_dir, f"{iteration}_neural" + ".mp4")
+                video_path = os.path.join(video_dir, f"{iteration}_457" + ".mp4")
                 with imageio.get_writer(video_path, mode='I', fps=60, codec='libx264') as video_out:
                     yaw_scale = 50.0
                     pitch_scale = 20.0

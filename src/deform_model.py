@@ -61,13 +61,13 @@ class Deform_Model(nn.Module):
             uv_size=256,
             patch_size=4,
             pixel_dim=4,
-            dim=256,
+            dim=128,
             mlp_dim=256,
             out_dim=10,
             cond_dim=120,
             qk_dim=64,
-            v_dim=64,
-            depth=8,
+            v_dim=32,
+            depth=12,
             head=4,
         )
         
@@ -123,7 +123,7 @@ class Deform_Model(nn.Module):
         # ), dim=1)
         self.transformer_input = rast_out_super
     
-    def decode(self, codedict, use_xyz_offset=True):
+    def decode(self, codedict, use_xyz_offset=True, scaling=1.):
         shape_code = codedict['shape'].detach()
         expr_code = codedict['expr'].detach()
         jaw_pose = codedict['jaw_pose'].detach()
@@ -136,13 +136,13 @@ class Deform_Model(nn.Module):
         # condition = condition.unsqueeze(1).repeat(1, self.v_num, 1)
         # uv_vertices_shape_embeded_condition = torch.cat((self.uv_vertices_shape_embeded, condition), dim=2)
         # deforms = self.deformNet(uv_vertices_shape_embeded_condition)
-        # Transformer 
+        # Transformer
         condition = condition.unsqueeze(1)
         deforms = self.deformNet(self.transformer_input, condition)
         deforms = deforms[0][self.uvmask_flaten_idx].unsqueeze(0)
 
         deforms = torch.tanh(deforms)
-        uv_vertices_deforms = deforms[..., :3]
+        uv_vertices_deforms = deforms[..., :3] / scaling
         rot_delta_0 = deforms[..., 3:7]
         rot_delta_r = torch.exp(rot_delta_0[..., 0]).unsqueeze(-1)
         rot_delta_v = rot_delta_0[..., 1:]
